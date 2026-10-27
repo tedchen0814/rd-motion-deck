@@ -12,7 +12,12 @@
 #
 # Options:
 #   -Agent claude|codex|both   where to put skills (default: claude -> ~\.claude\skills; codex -> ~\.agents\skills)
-#   -InstallPrereqs            install missing Git / Node.js / ffmpeg / Python with winget
+#   -Scope user|project        user (default): global skills folder, loaded in every project.
+#                              project: only into <ProjectPath>\.claude\skills, loaded only when that project is open
+#                              (Claude Code only). Every installed skill adds to the skill list loaded at the start of
+#                              each conversation, so project scope keeps other projects lighter.
+#   -ProjectPath <dir>         project folder for -Scope project (default: the current folder)
+#   -InstallPrereqs           install missing Git / Node.js / ffmpeg / Python with winget
 #   -Latest                    use the latest claude-motion-explainer instead of the tested commit
 #   -DisableTelemetry          turn off HyperFrames anonymous usage statistics
 #   -SkipHyperFrames           do not install/update the HyperFrames CLI and its skills
@@ -21,6 +26,8 @@
 [CmdletBinding()]
 param(
   [ValidateSet("claude", "codex", "both")] [string]$Agent = "claude",
+  [ValidateSet("user", "project")] [string]$Scope = "user",
+  [string]$ProjectPath = "",
   [switch]$InstallPrereqs,
   [switch]$Latest,
   [switch]$DisableTelemetry,
@@ -115,8 +122,32 @@ if ($missing.Count -gt 0) {
 
 # ---------------------------------------------------------------- 2. skills folders
 $targets = @()
-if ($Agent -in @("claude", "both")) { $targets += (Join-Path $HOME ".claude\skills") }
-if ($Agent -in @("codex", "both"))  { $targets += (Join-Path $HOME ".agents\skills") }
+if ($Scope -eq "project") {
+  if ($Agent -ne "claude") {
+    Write-Host "-Scope project currently supports Claude Code only (-Agent claude). Use the default -Scope user for Codex." -ForegroundColor Red
+    exit 2
+  }
+  if (-not $ProjectPath) { $ProjectPath = (Get-Location).Path }
+  if (-not (Test-Path -LiteralPath $ProjectPath -PathType Container)) {
+    Write-Host "-ProjectPath not found: $ProjectPath" -ForegroundColor Red
+    exit 2
+  }
+  $targets += (Join-Path (Resolve-Path -LiteralPath $ProjectPath).Path ".claude\skills")
+} else {
+  if ($Agent -in @("claude", "both")) { $targets += (Join-Path $HOME ".claude\skills") }
+  if ($Agent -in @("codex", "both"))  { $targets += (Join-Path $HOME ".agents\skills") }
+}
+
+$skillCount = 1 + $MeSkills.Count
+if (-not $SkipHyperFrames) { $skillCount += $HfSkills.Count }
+if (-not $CheckOnly) {
+  if ($Scope -eq "user") {
+    Warn "$skillCount skills will go into the GLOBAL skills folder, so every conversation in every project loads their names and descriptions."
+    Warn "If you only need them in one project, stop and rerun with: -Scope project -ProjectPath <project folder>"
+  } else {
+    Say "Project scope: $skillCount skills -> $($targets[0])"
+  }
+}
 
 if ($CheckOnly) {
   Say "Installed skills"
@@ -253,6 +284,17 @@ try {
 
   Write-Host ""
   Write-Host "Done." -ForegroundColor Green
+  if ($Scope -eq "project") {
+    Write-Host "Installed for this project only: $($targets[0])"
+    Write-Host "Open your agent in that project folder to use these skills; other projects are not affected."
+    Write-Host "If that project is a public git repo, add '.claude/' to its .git/info/exclude so the skill files are not pushed."
+    Write-Host "(The HyperFrames CLI, Python packages and HYPERFRAMES_SKIP_SKILLS are installed machine-wide either way.)"
+  } else {
+    Write-Host "Reminder: $skillCount skills are now global and load in every conversation."
+    Write-Host "To limit them to one project, move these folders to <project>\.claude\skills (move the whole hyperframes* group together),"
+    Write-Host "or rerun this installer with -Scope project -ProjectPath <project folder>."
+  }
+  Write-Host ""
   Write-Host "Restart your agent (Claude Code / Codex) so it loads the new skills, then try:"
   Write-Host "  /rd-motion-deck  (or just describe a tech-sharing deck that needs animations)"
   Write-Host "Optional fonts: GenSeki Gothic (https://github.com/ButTaiwan/genseki-font). Without it, decks fall back to Microsoft JhengHei."

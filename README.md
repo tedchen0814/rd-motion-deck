@@ -68,7 +68,18 @@ curl -fsSL https://raw.githubusercontent.com/tedchen0814/rd-motion-deck/main/ins
 | HyperFrames 官方 skills（`hyperframes`、`hyperframes-*`、`media-use`、`faceless-explainer`，共 11 個） | 固定 commit `207c8a4` | [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) |
 | Python 套件 `edge-tts`、`pillow`、`fonttools`、`brotli` | 最新 | pip |
 
-Skills 裝在 `~/.claude/skills/`（Claude Code）。已經有同名 skill 時，舊版會先移到 `~/.claude/skill-backups/<日期時間>/`，不會覆蓋掉。
+Skills 預設裝在 `~/.claude/skills/`（Claude Code）。已經有同名 skill 時，舊版會先移到 `~/.claude/skill-backups/<日期時間>/`，不會覆蓋掉。
+
+> **安裝前請先想一下：要裝全域，還是只裝在某個專案？**
+> 這個安裝包會裝 15 個 skill（略過 HyperFrames 時為 4 個）。裝在全域的話，**每個專案的每個對話**開頭都會載入這些 skill 的名稱與說明，占用上下文，即使那個專案根本不做動畫。
+> 如果只在特定專案用，建議加上 `-Scope project`（Bash：`--scope project`），只裝到該專案的 `.claude/skills/`，只有開啟那個專案時才載入：
+>
+> ```powershell
+> & ([scriptblock]::Create((irm https://raw.githubusercontent.com/tedchen0814/rd-motion-deck/main/install.ps1))) -Scope project -ProjectPath "D:\我的專案"
+> ```
+>
+> 專案層目前只支援 Claude Code。HyperFrames CLI、Python 套件與環境變數仍是整台電腦共用。專案若是公開 git repo，請把 `.claude/` 加進 `.git/info/exclude`，避免把 skill 檔推上去。
+> 已經裝成全域也沒關係：把這 15 個資料夾搬到專案的 `.claude/skills/` 即可（`hyperframes*` 要整組一起搬）。
 
 #### 為什麼 HyperFrames skills 要固定版本
 
@@ -87,6 +98,8 @@ Git、Node.js 22 以上、ffmpeg、Python 3.9 以上。腳本會先檢查，缺�
 | PowerShell | Bash | 作用 |
 |---|---|---|
 | `-Agent codex` | `--agent codex` | 裝到 `~/.agents/skills/`（Codex）；`both` 兩邊都裝 |
+| `-Scope project` | `--scope project` | 只裝到專案的 `.claude/skills/`，不裝到全域（僅 Claude Code；預設 `user`＝全域） |
+| `-ProjectPath <資料夾>` | `--project-path <資料夾>` | 搭配 `-Scope project` 指定專案資料夾（預設為目前所在資料夾） |
 | `-InstallPrereqs` | — | 用 winget 安裝缺少的 Git、Node.js、ffmpeg、Python |
 | `-Latest` | `--latest` | 用 claude-motion-explainer 的最新版，而不是測試過的版本 |
 | `-DisableTelemetry` | `--disable-telemetry` | 關閉 HyperFrames 的匿名使用統計（預設開啟） |

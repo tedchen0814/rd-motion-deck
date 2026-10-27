@@ -13,6 +13,11 @@
 #
 # Options:
 #   --agent claude|codex|both   where to put skills (default claude -> ~/.claude/skills; codex -> ~/.agents/skills)
+#   --scope user|project        user (default): global skills folder, loaded in every project.
+#                               project: only into <project-path>/.claude/skills, loaded only when that project is open
+#                               (Claude Code only). Every installed skill adds to the skill list loaded at the start of
+#                               each conversation, so project scope keeps other projects lighter.
+#   --project-path <dir>        project folder for --scope project (default: the current folder)
 #   --latest                    use the latest claude-motion-explainer instead of the tested commit
 #   --disable-telemetry         turn off HyperFrames anonymous usage statistics
 #   --skip-hyperframes          do not install/update the HyperFrames CLI and its skills
@@ -33,10 +38,12 @@ HF_SKILLS=(hyperframes hyperframes-animation hyperframes-audio hyperframes-cli h
            hyperframes-creative hyperframes-keyframes hyperframes-registry hyperframes-studio
            media-use faceless-explainer)
 
-AGENT=claude; LATEST=0; NO_TELEMETRY=0; SKIP_HF=0; CHECK_ONLY=0
+AGENT=claude; SCOPE=user; PROJECT_PATH=""; LATEST=0; NO_TELEMETRY=0; SKIP_HF=0; CHECK_ONLY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --agent) AGENT="$2"; shift 2 ;;
+    --scope) SCOPE="$2"; shift 2 ;;
+    --project-path) PROJECT_PATH="$2"; shift 2 ;;
     --latest) LATEST=1; shift ;;
     --disable-telemetry) NO_TELEMETRY=1; shift ;;
     --skip-hyperframes) SKIP_HF=1; shift ;;
@@ -87,12 +94,32 @@ fi
 
 # ---------------------------------------------------------------- 2. skills folders
 targets=()
-case "$AGENT" in
-  claude) targets=("$HOME/.claude/skills") ;;
-  codex)  targets=("$HOME/.agents/skills") ;;
-  both)   targets=("$HOME/.claude/skills" "$HOME/.agents/skills") ;;
-  *) echo "--agent must be claude, codex or both"; exit 2 ;;
+case "$SCOPE" in
+  user)
+    case "$AGENT" in
+      claude) targets=("$HOME/.claude/skills") ;;
+      codex)  targets=("$HOME/.agents/skills") ;;
+      both)   targets=("$HOME/.claude/skills" "$HOME/.agents/skills") ;;
+      *) echo "--agent must be claude, codex or both"; exit 2 ;;
+    esac ;;
+  project)
+    [ "$AGENT" = claude ] || { echo "--scope project currently supports Claude Code only (--agent claude). Use the default --scope user for Codex."; exit 2; }
+    [ -n "$PROJECT_PATH" ] || PROJECT_PATH="$PWD"
+    [ -d "$PROJECT_PATH" ] || { echo "--project-path not found: $PROJECT_PATH"; exit 2; }
+    targets=("$(cd "$PROJECT_PATH" && pwd)/.claude/skills") ;;
+  *) echo "--scope must be user or project"; exit 2 ;;
 esac
+
+SKILL_COUNT=$((1 + ${#ME_SKILLS[@]}))
+[ $SKIP_HF = 0 ] && SKILL_COUNT=$((SKILL_COUNT + ${#HF_SKILLS[@]}))
+if [ $CHECK_ONLY = 0 ]; then
+  if [ "$SCOPE" = user ]; then
+    warn "$SKILL_COUNT skills will go into the GLOBAL skills folder, so every conversation in every project loads their names and descriptions."
+    warn "If you only need them in one project, stop and rerun with: --scope project --project-path <project folder>"
+  else
+    say "Project scope: $SKILL_COUNT skills -> ${targets[0]}"
+  fi
+fi
 
 if [ $CHECK_ONLY = 1 ]; then
   say "Installed skills"
@@ -200,6 +227,17 @@ fi
 
 echo
 printf '\033[32mDone.\033[0m\n'
+if [ "$SCOPE" = project ]; then
+  echo "Installed for this project only: ${targets[0]}"
+  echo "Open your agent in that project folder to use these skills; other projects are not affected."
+  echo "If that project is a public git repo, add '.claude/' to its .git/info/exclude so the skill files are not pushed."
+  echo "(The HyperFrames CLI, Python packages and HYPERFRAMES_SKIP_SKILLS are installed machine-wide either way.)"
+else
+  echo "Reminder: $SKILL_COUNT skills are now global and load in every conversation."
+  echo "To limit them to one project, move these folders to <project>/.claude/skills (move the whole hyperframes* group together),"
+  echo "or rerun this installer with --scope project --project-path <project folder>."
+fi
+echo
 echo "Restart your agent (Claude Code / Codex) so it loads the new skills, then try:"
 echo "  /rd-motion-deck  (or just describe a tech-sharing deck that needs animations)"
 echo "Optional fonts: GenSeki Gothic (https://github.com/ButTaiwan/genseki-font). Without it, decks fall back to Microsoft JhengHei."
