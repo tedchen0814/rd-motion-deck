@@ -20,7 +20,8 @@ Existing skills with the same names are moved to `~/.claude/skill-backups/<times
 1. **Pick the agent and the scope.**
    - Agent: Claude Code → default (`~/.claude/skills`). Codex → add `-Agent codex` / `--agent codex`. If unsure, ask the user.
    - **Scope — always ask the user, in their language, before installing.** Tell them: this installs 15 skills (4 with `-SkipHyperFrames`); in the global folder, every conversation in every project loads all their names and descriptions, which costs context even in projects that never make animations. Then ask: "Install globally, or only for one project?"
-     - Only for one project (Claude Code only): get the project folder and add `-Scope project -ProjectPath "<folder>"` / `--scope project --project-path "<folder>"`.
+     - Only for one project (Claude Code only): get the project folder and add `-Scope project -ProjectPath "<folder>"` / `--scope project --project-path "<folder>"`. **Never rely on the default** (the current folder, which is often the home folder or a temp folder, so the skills would silently land in the wrong place): always pass `-ProjectPath` explicitly, and confirm the full absolute path with the user before running.
+     - The user has no project folder yet? Do not guess one. Offer three choices and wait for the answer: (a) create a new project folder together (agree on the location, create it, then install into it); (b) install globally for now, and move the skills into a project's `.claude/skills/` later (move the `hyperframes*` group together); (c) do not install yet, and come back once the project exists.
      - Globally (default): continue as is. Codex always installs globally for now.
 
 2. **Check first, change nothing.** Run the installer in check mode and read its output:
